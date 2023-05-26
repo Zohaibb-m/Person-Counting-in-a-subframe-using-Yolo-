@@ -3,58 +3,120 @@ import cv2
 import numpy as np
 import pytesseract
 import os
+from easyocr import Reader
+import datetime
 
 vertices = [
     [
-    (35, 70),
-    (84, 70),
-    (84, 107),
-    (35, 107)
+        (38, 70),
+        (83, 70),
+        (83, 109),
+        (38, 109)
 
-], [
-    (101, 70),
-    (149, 70),
-    (149, 107),
-    (101, 107)
-], [
-    (170, 70),
-    (259, 70),
-    (259, 107),
-    (170, 107)
-], [
-    (272, 70),
-    (346, 70),
-    (346, 107),
-    (272, 107)
-], [
-    (362, 73),
-    (362, 105),
-    (408, 105),
-    (408, 73)
-], [
-    (424, 70),
-    (472, 70),
-    (472, 107),
-    (424, 107)
-],  [
-    (493, 70),
+    ], [
+        (101, 70),
+        (154, 70),
+        (154,  107),
+        (101, 107)
+    ],
+    [
+        (170, 70),
+        (255, 70),
+        (255, 107),
+        (170, 107)
+    ],
+    #[     (272, 70),
+    #     (346, 70),
+    #     (346, 107),
+    #     (272, 107)
+    # ],
+    [
+        (362, 73),
+        (362, 105),
+        (408, 105),
+        (408, 73)
+    ], [
+        (424, 70),
+        (472, 70),
+        (472, 107),
+        (424, 107)
+    ], [
+        (493, 70),
+        (540, 70),
+        (540, 107),
+        (493, 107)
+    ]
+]
+
+vertices_full_date = [
+    (35, 70),
     (540, 70),
     (540, 107),
-    (493, 107)
-]
+    (35, 107)
 ]
 
 # coordinates = [[35, 70, 84, 107], [101, 70, 149, 107], [170, 70, 259, 107], [272, 70, 346, 107], [361, 70, 411, 107],
 #                [424, 70, 472, 107], [493, 70, 540, 107]]
 
+weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+reader = Reader(['en'], True)
 last_five_results = []
 sec = 56
 mint = 38
 hour = 21
+date = False
+day = False
+month = False
+year = False
+date_found = False
 
+
+def find_date(frame):
+    global date, month, year, day, date_found
+    if not date:
+        cropped_frame = crop_frame(frame, vertices[1])
+        result = reader.readtext(cropped_frame, allowlist='0123456789')
+        for (bbox, text, prob) in result:
+            if 31 >= int(text) > 0:
+                date = int(text)
+    if not month:
+        cropped_frame = crop_frame(frame, vertices[0])
+        # cropped_frame = pre_process(cropped_frame)
+        # cv2.imshow('fr', cropped_frame)
+        result = reader.readtext(cropped_frame, allowlist='0123456789')
+        for (bbox, text, prob) in result:
+            print(f'Result{text}')
+            if 12 >= int(text) > 0:
+                month = int(text)
+    if not year:
+        cropped_frame = crop_frame(frame, vertices[2])
+        result = reader.readtext(cropped_frame, allowlist='0123456789')
+        for (bbox, text, prob) in result:
+            if len(text) == 4:
+                year = int(text)
+    if not day:
+        if date and month and year:
+            day = weekdays[datetime.datetime(year, month, date).weekday()]
+
+    if date and month and year and day:
+        date_found = True
+
+    if date_found:
+        return f'{month}-{date}-{year}-{day}'
+    return f'{month}-{date}-{year}-{day}RERER'
+
+
+def get_hour(frame):
+    cropped_frame = crop_frame(frame, vertices[3])
+    cv2.imshow('fr', cropped_frame)
+    result = reader.readtext(cropped_frame, allowlist='0123456789')
+    for (bbox, text, prob) in result:
+        if 23 >= int(text) >= 0:
+            return int(text)
+    return False
 
 def get_cropped_image(frame, coordinate):
-    # print(frame.shape)
+    print(coordinate)
     return frame[coordinate[1]:coordinate[3], coordinate[0]: coordinate[2]]
 
 
@@ -71,25 +133,6 @@ def pre_process(frame):
     return thr
 
 
-# def find_date(frame):
-#     predictions = []
-#     images = []
-#     for i in range(0, 7):
-#         cropped_img = get_cropped_image(frame, coordinates[i])
-#         # pre_proceesed_img = pre_process(cropped_img)
-#         images.append(cropped_img)
-#         # cv2.imshow('thr', cropped_img)
-#         predictions.append(pytesseract.image_to_string(cropped_img))
-#     print(predictions)
-#     # cv2.imshow('thr', images[0])
-#     # cv2.imshow('thr1', images[1])
-#     # cv2.imshow('thr2', images[2])
-#     # cv2.imshow('thr3', images[3])
-#     # cv2.imshow('thr4', images[4])
-#     # cv2.imshow('thr5', images[5])
-#     # cv2.imshow('thr6', images[6])
-
-
 def crop_frame(frame, vertices):
     mask = np.zeros_like(frame)
     roi_corners = np.array([vertices], dtype=np.int32)
@@ -97,26 +140,31 @@ def crop_frame(frame, vertices):
     return cv2.bitwise_and(frame, mask)
 
 
-def find_date(frame):
+def find_date_through_easyocr(frame):
+    print(find_date(frame))
+
+
+def find_date_thorugh_tessaract(frame):
     predictions = []
     images = []
-    for i in range(0, 7):
+    for i in range(0, 6):
         cropped_frame = crop_frame(frame, vertices[i])
         pre_processed_img = pre_process(cropped_frame)
         images.append(pre_processed_img)
-        predictions.append(pytesseract.image_to_string(pre_processed_img))
+        predictions.append(pytesseract.image_to_string(pre_processed_img, config="digits"))
     print(predictions)
-    for i in range(7):
+    for i in range(6):
         cv2.namedWindow(f'thr{i}', cv2.WINDOW_NORMAL)
-        cv2.resizeWindow(f'thr{i}', (1024,720))
+        cv2.resizeWindow(f'thr{i}', (1024, 720))
         cv2.imshow(f'thr{i}', images[i])
+
 
 def run(args):
     # Open video file
     cap = cv2.VideoCapture(args.source)
     # Get video dimensions
     # width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    # height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    # height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))q
     fps = int(cap.get(cv2.CAP_PROP_FPS))
     i = 0
     while True:
@@ -133,8 +181,9 @@ def run(args):
                 if mint == 60:
                     mint = 0
                     hour += 1
-        if i % int(fps) / int(fps / 2) == 0:
-            find_date(frame)
+        if i % int(int(fps) / int(fps / 2)) == 0:
+            find_date_through_easyocr(frame)
+            print(get_hour(frame))
         i += 1
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
@@ -151,7 +200,7 @@ if __name__ == '__main__':
     for file in filenames:
         parser = argparse.ArgumentParser()
         # parser.add_argument('--source', type=str, default=f'../../cctv_ger/{file}', help='path to video file')
-        parser.add_argument('--source', type=str, default=f'../sample_videos/sample4.mp4', help='path to video file')
+        parser.add_argument('--source', type=str, default=f'../sample_videos/video2.mp4', help='path to video file')
         parser.add_argument('--weights', nargs='+', type=str,
                             default=r"/home/kamran/tkbees/Project_Person_Counting/yolov5/Yolov5l_Fine_Tuned.pt",
                             help='path to YOLO weights file')

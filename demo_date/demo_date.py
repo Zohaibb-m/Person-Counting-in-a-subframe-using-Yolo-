@@ -85,7 +85,7 @@ def find_date(frame):
         # cv2.imshow('fr', cropped_frame)
         result = reader.readtext(cropped_frame, allowlist='0123456789')
         for (bbox, text, prob) in result:
-            print(f'Result{text}')
+            # print(f'Result{text}')
             if 12 >= int(text) > 0:
                 month = int(text)
     if not year:
@@ -103,7 +103,7 @@ def find_date(frame):
 
     if date_found:
         return f'{month}-{date}-{year}-{day}'
-    return f'{month}-{date}-{year}-{day}RERER'
+    return False
 
 
 def get_hour(frame):
